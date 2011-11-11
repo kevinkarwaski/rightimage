@@ -113,6 +113,11 @@ attribute "rightimage/sandbox_repo_tag",
   :description => "The tag on the sandbox_builds repo from which to build rightscale package.",
   :required => "optional"
   
+attribute "rightimage/rightlink_ts",
+  :display_name => "RightLink Timestamp ",
+  :description => "Creation time timestamp of our new rightlink package",
+  :required => true
+  
 attribute "rightimage/rightlink_version",
   :display_name => "RightLink Version",
   :description => "The RightLink version we are building into our image",

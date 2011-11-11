@@ -1,4 +1,8 @@
-rightlink_file="rightscale_#{node[:rightimage][:rightlink_version]}-#{node[:rightimage][:platform]}_#{node[:rightimage][:release_number]}-" + ((node[:rightimage][:platform] == "ubuntu") && (node[:rightimage][:arch] == "x86_64") ? "amd64" : node[:rightimage][:arch]) + "." + (node[:rightimage][:platform] == "centos" ? "rpm" : "deb")
+
+rl_arch = (node[:rightimage][:platform] == "ubuntu") && (node[:rightimage][:arch] == "x86_64") ? "amd64" : node[:rightimage][:arch]
+rl_pkg = node[:rightimage][:platform] == "centos" ? "rpm" : "deb"
+
+rightlink_file="rightscale_#{node[:rightimage][:rightlink_version]}-#{node[:rightimage][:platform]}_#{node[:rightimage][:release_number]}-#{rl_arch}.#{rl_pkg}"
 
 execute "insert_rightlink_version" do 
   command  "echo -n " + node[:rightimage][:rightlink_version] + " > " + node[:rightimage][:mount_dir] + "/etc/rightscale.d/rightscale-release"
@@ -13,12 +17,8 @@ bash "checkout_repo" do
     git clone git@github.com:rightscale/sandbox_builds.git 
     cd sandbox_builds 
     export sha=$(git log --pretty=format:%H -1)
-    touch SHA-$sha.txt
-    mv SHA-$sha.txt #{node[:rightimage][:mount_dir]}/..
+    touch #{node[:rightimage][:mount_dir]}/../SHA-$sha.txt
     git checkout #{node[:rightimage][:sandbox_repo_tag]} --force
-    git submodule init 
-    git submodule update
-    cd repos/right_net
     git submodule init 
     git submodule update
     cd ../..
@@ -41,7 +41,7 @@ bash "download_rightlink" do
     rightlink_os="#{node[:rightimage][:platform]}"
     
     buckets=( rightscale_rightlink rightscale_rightlink_dev )
-    locations=( $rightlink_ver/$rightlink_os $rightlink_ver / )
+    locations=( linux-build-$rightlink_ver/official $rightlink_ver/$rightlink_os $rightlink_ver / )
     
     for bucket in ${buckets[@]}
     do
@@ -108,19 +108,17 @@ end
 
 bash "upload_rightlink" do
   code <<-EOC
-    bucket="rightscale_rightlink"
-    [ #{node[:rightimage][:debug]} == "true" ] && bucket="${bucket}_dev"
+    bucket="rightscale_rightlink_dev"
     rightlink_ver="#{node[:rightimage][:rightlink_version]}"
     rightlink_os="#{node[:rightimage][:platform]}"
-    rightlink_path=$rightlink_ver/$rightlink_os/#{rightlink_file}
+    rightlink_ts="#{node[:rightimage][:rightlink_ts]}"
+    rightlink_path=linux-build-$rightlink_ver/$rightlink_ts/#{rightlink_file}
     check="curl --output /dev/null --head --silent --fail --connect-timeout 10 http://s3.amazonaws.com/$bucket/$rightlink_path"
 
     `$check`
     if [ "$?" -ne "0" ]; then
       export AWS_ACCESS_KEY_ID=#{node[:rightimage][:aws_access_key_id_for_upload]}
-      echo AAKI: #{node[:rightimage][:aws_access_key_id_for_upload]}
       export AWS_SECRET_ACCESS_KEY=#{node[:rightimage][:aws_secret_access_key_for_upload]}
-      echo ASAK: #{node[:rightimage][:aws_secret_access_key_for_upload]}
       export AWS_CALLING_FORMAT=SUBDOMAIN 
       
       set -ex
